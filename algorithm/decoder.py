@@ -179,6 +179,20 @@ def decode_schedule(
         valid = [m for m in allowed if m in machines]
         disabled = [m for m in valid if m in disabled_machines]
 
+        print(f'[排产-未排] {job["job_id"]} | 工艺路线={job["工艺路线"]} | 工站={station} | 数量={job["数量"]} | 优先级={job["优先级"]}',flush=True)
+        print(f'  工艺路线配置设备: {",".join(allowed) if allowed else "无"}',flush=True)
+        print(f'  有效设备(已登记且有UPH): {",".join(valid) if valid else "无"}',flush=True)
+        if disabled:
+            statuses={m: machine_status.get(m,"未知") for m in disabled}
+            print(f'  故障/维修设备: {", ".join(f"{m}(状态={s})" for m,s in statuses.items())}',flush=True)
+        if job.get('_excluded'):
+            print(f'  设备排除原因:',flush=True)
+            for m,r in job['_excluded'].items():
+                print(f'    {m}: {r}',flush=True)
+        else:
+            print(f'  无设备排除记录(_excluded为空)',flush=True)
+
+
         if not allowed:
             reason = "工艺路线-工站没有配置设备"
         elif not valid:
@@ -189,6 +203,8 @@ def decode_schedule(
             reason = '；'.join(sorted(set(job['_excluded'].values())))
         else:
             reason = "其他设备约束"
+        
+        print(f'  => 最终原因: {reason}',flush=True)
 
         unscheduled_reasons.append({
             "job_id": job["job_id"],

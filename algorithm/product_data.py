@@ -70,8 +70,14 @@ def load_product(path):
         valid=pd.notna(uph) and math.isfinite(float(uph)) and float(uph)>0
         status=text(row['设备状态']) or '未知'
         if status not in {'生产中','空闲'}|BLOCKED:
+            print(f'[数据校验-设备状态] {name}: 状态值"{text(row["设备状态"])}"不在已知枚举中（生产中/空闲/故障/维修/维修中/停机/不可用），本次禁用。',flush=True)
             warnings.append(f'{name} 状态未识别，本次禁用。'); status='未知'
         if conflict:
+            dup_cols=[]
+            for c in cols:
+                vals=rows[c].astype(str).unique()
+                if len(vals)>1: dup_cols.append(f'{c}({" / ".join(vals)})')
+            print(f'[数据校验-设备冲突] {name}: 在3-设备表中出现{len(rows)}条记录，以下字段值不一致：{"；".join(dup_cols)}。已禁用，请核对主数据。',flush=True)
             warnings.append(f'{name} 存在冲突设备记录，已禁用，请核对主数据。');status='数据冲突'
         if not valid: warnings.append(f'{name} 缺少正数 UPH，禁止分配。')
         for col in [large_col,double_col]:
@@ -89,18 +95,12 @@ def load_product(path):
         routes.setdefault((route,station),set()).update(names)
         unknown.update(n for n in names if n not in machines)
     routes={k:sorted(v) for k,v in routes.items()};station_map={}
-    if '工站-设备表' in tables:
-        rel=tables['工站-设备表']
-        if not {'设备名','工站'}.issubset(rel.columns): raise DatasetError('工站-设备表缺少设备名或工站列。')
-        for _,row in rel.iterrows():
-            station,name=text(row['工站']),text(row['设备名'])
-            if station and name in machines: station_map.setdefault(station,set()).add(name)
-    else:
-        warnings.append('缺少工站-设备表，已按工艺路线-设备表重建工站关系。')
-        for (_,station),names in routes.items(): station_map.setdefault(station,set()).update(n for n in names if n in machines)
+    for (_,station),names in routes.items(): station_map.setdefault(station,set()).update(n for n in names if n in machines)
     for station,names in station_map.items():
         for name in names: machines[name]['stations'].append(station)
-    if unknown: warnings.append(f'路线引用了 {len(unknown)} 个未登记设备名，已排除这些候选。')
+    if unknown:
+        print(f'[数据校验-未登记设备] 工艺路线-设备表引用了{len(unknown)}个未在3-设备表中登记的设备名：{", ".join(sorted(unknown))}。已排除这些候选。',flush=True)
+        warnings.append(f'路线引用了 {len(unknown)} 个未登记设备名，已排除这些候选。')
     wip=tables['6-WIP在制表'].copy();flow=tables['8-制造单批次流转表'].copy()
     for frame,name in [(wip,'WIP'),(flow,'批次流转')]:
         for c in ['制造单号','批次','工艺路线']: frame[c]=frame[c].map(text)
@@ -115,11 +115,25 @@ def load_product(path):
             raise DatasetError(name+'存在空标识、空工艺或非正数量。')
     wip['设备']=wip['设备'].map(text);wip['投产时间']=pd.to_datetime(wip['投产时间'],format='mixed',errors='coerce')
     if wip['投产时间'].isna().any() or (wip['设备']=='').any(): raise DatasetError('WIP 有空设备或无效投产时间。')
-    if set(wip['设备'])-set(machines): warnings.append('部分 WIP 设备未登记，保留异常记录，不映射为可派设备。')
+    unregistered_wip_records=[]
+    for _,w in wip.iterrows():
+        device=w['设备'];route=w['工艺路线'];station=w['工站']
+        route_devices=routes.get((route,station),[])
+        if device not in route_devices:
+            unregistered_wip_records.append(f'{device}(工艺路线={route},工站={station})')
+    if unregistered_wip_records:
+        print(f'[数据校验-WIP未登记设备] WIP在制表中以下{len(unregistered_wip_records)}条记录的设备未在5-工艺路线-设备表中对应(工艺路线,工站)下找到：{"；".join(unregistered_wip_records)}。保留异常记录，不映射为可派设备。',flush=True)
+        warnings.append('部分 WIP 设备未登记，保留异常记录，不映射为可派设备。')
     priority=tables['7-优先级'].copy();priority['制造单号']=priority['制造单号'].map(text)
     priority['优先级']=pd.to_numeric(priority['优先级'],errors='coerce')
     if not priority['优先级'].map(lambda x:pd.notna(x) and math.isfinite(float(x))).all(): raise DatasetError('优先级必须为有限数值。')
-    flow['优先级']=flow['制造单号'].map(priority.groupby('制造单号')['优先级'].max()).fillna(0)
+    priority_map=priority.groupby('制造单号')['优先级'].max()
+    flow['优先级']=flow['制造单号'].map(priority_map)
+    missing_pri_mask=flow['优先级'].isna()
+    flow['优先级']=flow['优先级'].fillna(0)
+    if missing_pri_mask.any():
+        missing_orders=sorted(flow.loc[missing_pri_mask,'制造单号'].unique())
+        print(f'[数据校验-优先级缺失] 以下{len(missing_orders)}个制造单号在7-优先级表中未找到，优先级按0处理：{", ".join(missing_orders)}',flush=True)
     warnings.append('优先级沿用当前算法：数字越大越紧急，缺失值按 0 处理。')
     orders=tables.get('2-制造单',pd.DataFrame());products=tables.get('4-产品表',pd.DataFrame())
     order_map={};size_map={}
@@ -134,7 +148,14 @@ def load_product(path):
         order=order_map.get(row['制造单号'])
         size=size_map.get(text(order['成品编码'])) if order is not None else None
         double=text(order['是否双芯']) in {'是','1','True'} if order is not None else None
-        if size is None: unknown_chips+=1
+        if size is None:
+            unknown_chips+=1
+            if order is None:
+                print(f'[数据校验-芯片尺寸] {row["job_id"]}: 制造单号"{row["制造单号"]}"未在2-制造单表中找到，无法核验芯片尺寸，禁止分配到限制大芯片的设备。',flush=True)
+            else:
+                product_code=text(order['成品编码'])
+                if product_code not in size_map:
+                    print(f'[数据校验-芯片尺寸] {row["job_id"]}: 成品编码"{product_code}"未在4-产品表中找到芯片尺寸，无法核验，禁止分配到限制大芯片的设备。',flush=True)
         allowed=[];excluded={}
         for name in routes.get((row['工艺路线'],row['下一工站']),[]):
             m=machines.get(name);reason=''
