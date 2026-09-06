@@ -21,9 +21,19 @@ import zipfile
 ROOT=Path(__file__).resolve().parents[1]
 STORAGE=ROOT/'storage'
 MAX_UPLOAD=20*1024*1024
-STATIC={'/':'index.html','/index.html':'index.html','/app.js':'app.js','/style.css':'style.css','/format.css':'format.css'}
+# STATIC={'/':'index.html','/index.html':'index.html','/app.js':'app.js','/style.css':'style.css','/format.css':'format.css'}
+# POOL=ThreadPoolExecutor(max_workers=1,thread_name_prefix='rtd-job')
+# STATIC.update({'/workspace.css':'workspace.css','/assistant.js':'assistant.js'})
+STATIC={
+    '/': ('index.html', 'text/html; charset=utf-8'),
+    '/index.html': ('index.html', 'text/html; charset=utf-8'),
+    '/app.js': ('app.js', 'application/javascript; charset=utf-8'),
+    '/style.css': ('style.css', 'text/css; charset=utf-8'),
+    '/format.css': ('format.css', 'text/css; charset=utf-8'),
+    '/workspace.css': ('workspace.css', 'text/css; charset=utf-8'),
+    '/assistant.js': ('assistant.js', 'application/javascript; charset=utf-8')
+}
 POOL=ThreadPoolExecutor(max_workers=1,thread_name_prefix='rtd-job')
-STATIC.update({'/workspace.css':'workspace.css','/assistant.js':'assistant.js'})
 UPLOAD_LOCK=threading.BoundedSemaphore(1)
 JOB_LOCK=threading.Lock()
 
@@ -117,9 +127,13 @@ class Handler(BaseHTTPRequestHandler):
             logging.exception('get_failed');self.error('服务暂时无法读取数据，请稍后重试。',500)
     def get(self):
         path=urlsplit(self.path).path
+        # if path in STATIC:
+        #     file=ROOT/'frontend'/STATIC[path]
+        #     return self.send_bytes(file.read_bytes(),mimetypes.guess_type(file)[0] or 'text/plain')
         if path in STATIC:
-            file=ROOT/'frontend'/STATIC[path]
-            return self.send_bytes(file.read_bytes(),mimetypes.guess_type(file)[0] or 'text/plain')
+            name, ctype = STATIC[path]
+            file = ROOT / 'frontend' / name
+            return self.send_bytes(file.read_bytes(), ctype)
         if path=='/api/health': return self.json(dict(status='ok'))
         if path=='/api/datasets': return self.json(dict(items=[public_dataset(r) for r in query('SELECT * FROM datasets ORDER BY created_at DESC')]))
         if path=='/api/jobs': return self.json(dict(items=[public_job(r) for r in query('SELECT * FROM jobs ORDER BY created_at DESC')]))
