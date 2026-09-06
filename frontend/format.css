@@ -1,0 +1,6 @@
+.format-check{margin:16px 0 2px;padding:12px 13px;background:#f4f3eb;border:1px solid #e4e2d6;border-radius:3px}
+.format-check>div{display:flex;gap:10px;align-items:flex-start}
+.format-check strong{font-size:11px;font-weight:600}
+.format-check p{margin:5px 0 0;font-size:10px;color:var(--muted);line-height:1.6}
+.check-icon{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#dcebdc;color:var(--green);font-size:11px;font-weight:700;flex-shrink:0}
+.check-icon.warning{background:#f5e4c8;color:var(--amber)}

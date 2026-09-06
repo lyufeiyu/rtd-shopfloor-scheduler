@@ -1,0 +1,72 @@
+/* 冷灰与靛蓝主题；设备的绿、黄、红仅用于表达运行状态。 */
+:root {
+  --bg: #f4f5fa;
+  --ink: #22283e;
+  --muted: #727b91;
+  --line: #e4e7f0;
+  --green: #5754d6;
+  --soft: #eeedfc;
+  --red: #c44f5d;
+  --amber: #a97520;
+  --nav: #1b2037;
+}
+.sidebar { color: #c8cce0; }
+.brand-icon { background: #a9a4ff; color: #242044; }
+.brand-sub, .nav, .station-button, .side-bottom { color: #b1b8d2; }
+.side-label, .station-button span, .side-bottom div { color: #939dbe; }
+.nav.active { background: #3c3966; color: #e1deff; }
+.nav:hover { background: #303751; }
+.station-button.active { background: #2d324e; color: #d9d5ff; }
+.side-bottom { border-color: #363c58; }
+.side-dot, .live-dot { background: #9890f5; }
+.topbar { color: #6f7890; }
+.slash { color: #b7bed1; }
+.snapshot-pill { background: #eeedfc; border-color: #dddbf6; color: #5550b9; }
+.primary { background: #5754d6; border-color: #5754d6; }
+.primary:hover { background: #4542b8; border-color: #4542b8; }
+.secondary { color: #5c6481; border-color: #d9deeb; }
+.notice { background: #edf0f8; border-color: #dfe4f1; color: #626e8c; }
+.notice-tag { border-color: #d2d9eb; }
+.kpi-label { color: #68718b; }
+.kpi-unit, .kpi-note { color: #7c859b; }
+.kpi-icon { background: #f0f1f9; color: #7a7dad; }
+.kpi:nth-child(2) .kpi-value { color: #238366; }
+.count { background: #efeff9; color: #73749c; }
+.sub, .legend { color: #778199; }
+.search { background: #f7f8fc; }
+.machine { border-color: #e3e7f0; }
+.machine:hover { border-color: #aaa5e7; box-shadow: 0 4px 16px #3c347414; }
+.machine-icon { color: #949cb5; }
+.machine-route, .machine-bottom { color: #78829a; }
+.mini-bar i { background: #e9eaf3; }
+.mini-bar i.fill { background: #9995d8; }
+.pagination { color: #778199; }
+.pagination button { color: #697493; }
+.step-num { background: #eeedfc; border-color: #dcd9f6; }
+.step:not(:last-child)::before { border-color: #d9dcf0; }
+.formula { background: #f0effb; color: #5b5791; }
+.alert-item { border-color: #eceef5; color: #788299; }
+.alert-item strong { color: #525d77; }
+.empty { color: #778199; }
+th { background: #f7f8fc; color: #747e96; }
+td { border-color: #eceef5; color: #56607c; }
+tr.recommended { background: #f0effc; }
+tbody tr:hover { background: #f5f4fc; }
+.job { color: #525d77; }
+.job.active { background: #f0effc; border-color: #d6d2f3; }
+.job small, .flow small { color: #778199; }
+.job b { color: #996f2b; }
+.chip { background: #f0f0f9; color: #696d93; }
+.flow > div { background: #f7f7fc; border-color: #e5e4f2; }
+.timeline-label { color: #6b7590; }
+.track { background: repeating-linear-gradient(90deg, #f5f6fb 0, #f5f6fb calc(12.5% - 1px), #e4e7f2 calc(12.5% - 1px), #e4e7f2 12.5%); }
+.bar { background: #938bdb; }
+.bar.wip { background: repeating-linear-gradient(135deg, #bdc4dc 0, #bdc4dc 4px, #e0e4f0 4px, #e0e4f0 8px); }
+.timeline-axis { color: #7b859e; }
+.backdrop { background: #1d244d40; }
+.drawer { box-shadow: -10px 0 50px #21224c18; }
+.detail-grid small { color: #76829a; }
+.detail-task { color: #6c7892; }
+.detail-task strong { color: #4f5c7d; }
+.toast { background: #35305b; box-shadow: 0 5px 30px #29244730; }
+footer { color: #7c859b; }
