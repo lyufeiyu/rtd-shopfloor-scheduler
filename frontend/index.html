@@ -1,15 +1,16 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#262722"><title>RTD · 生产调度</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/format.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172e37"><title>RTD · 智能排产工作台</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/format.css"><link rel="stylesheet" href="/workspace.css"></head>
 <body>
 <header class="header"><a class="wordmark" href="/">RTD<span>生产调度</span></a><nav aria-label="工作区导航"><button class="nav active" data-view="workspace">调度工作区</button><button class="nav" data-view="devices">设备台账</button><button class="nav" data-view="results">排产方案</button><button class="nav" data-view="history">任务记录</button></nav><div class="service"><i id="service-dot"></i><span id="service-label">连接服务</span></div></header>
 <main><div class="page-title"><div><p class="eyebrow">OPERATIONS / 生产运营</p><h1 id="title">从一份数据，到一份生产计划。</h1></div><div class="dataset-switch"><label for="dataset-select">当前数据集</label><select id="dataset-select"><option value="">尚未导入数据</option></select></div></div>
 <div id="banner" class="banner" role="alert" hidden></div>
 <div id="job-status" hidden></div>
+<section id="assistant" class="assistant panel" aria-label="排产助手"></section>
 <section id="content" aria-live="polite"><div class="empty">正在连接生产调度服务…</div></section>
 <footer><span>RTD <b> / </b> PRODUCTION SCHEDULING</span><span id="data-source">导入您的数据集，开始安排生产。</span></footer>
 </main>
 <div id="shade" hidden></div><aside id="drawer" hidden role="dialog" aria-modal="true" aria-label="设备详情"></aside>
 <div id="toast" role="status" hidden></div>
-<script src="/app.js"></script>
+<script src="/assistant.js"></script><script src="/app.js"></script>
 </body></html>

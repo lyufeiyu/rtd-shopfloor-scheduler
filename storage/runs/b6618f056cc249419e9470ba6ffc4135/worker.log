@@ -1,0 +1,8 @@
+工站 1/1 WF
+SA Best Score: 7303790.24
+SA迭代次数: 11
+SA停止原因: 达到时间限制 1.0 秒
+SA运行时间: 1.07 秒
+排产方案已输出: E:\RTD\storage\runs\b6618f056cc249419e9470ba6ffc4135\station-001.xlsx
+甘特图已保存: E:\RTD\storage\runs\b6618f056cc249419e9470ba6ffc4135\station-001.png
+{"scheduled": 261, "unscheduled": 72, "machinesUsed": 1, "duration": 4.87, "violations": 0, "strategy": "balanced"}

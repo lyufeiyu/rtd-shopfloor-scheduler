@@ -23,6 +23,7 @@ STORAGE=ROOT/'storage'
 MAX_UPLOAD=20*1024*1024
 STATIC={'/':'index.html','/index.html':'index.html','/app.js':'app.js','/style.css':'style.css','/format.css':'format.css'}
 POOL=ThreadPoolExecutor(max_workers=1,thread_name_prefix='rtd-job')
+STATIC.update({'/workspace.css':'workspace.css','/assistant.js':'assistant.js'})
 UPLOAD_LOCK=threading.BoundedSemaphore(1)
 JOB_LOCK=threading.Lock()
 
@@ -37,6 +38,18 @@ def algorithm_python():
     return sys.executable
 
 def now(): return datetime.now(timezone.utc).isoformat()
+def public_job(row):
+    row=dict(row)
+    status=row['status']
+    progress=dict(percent=0,stage='queued',message='任务已进入队列，等待计算资源')
+    if status in ('running','failed'):
+        progress=dict(percent=2,stage='loading',message='正在准备排产环境')
+        try: progress=read_json(STORAGE/'runs'/row['id']/'progress.json')
+        except (OSError,ValueError): pass
+    if status=='succeeded': progress=dict(percent=100,stage='done',message='方案与下载文件已就绪')
+    if status=='failed': progress['message']=row.get('error') or '排产未完成，请重新提交'
+    row['progress']=progress
+    return row
 def read_json(path): return json.loads(Path(path).read_text(encoding='utf-8'))
 def db():
     connection=sqlite3.connect(STORAGE/'state.sqlite',timeout=20)
@@ -109,7 +122,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_bytes(file.read_bytes(),mimetypes.guess_type(file)[0] or 'text/plain')
         if path=='/api/health': return self.json(dict(status='ok'))
         if path=='/api/datasets': return self.json(dict(items=[public_dataset(r) for r in query('SELECT * FROM datasets ORDER BY created_at DESC')]))
-        if path=='/api/jobs': return self.json(dict(items=query('SELECT * FROM jobs ORDER BY created_at DESC')))
+        if path=='/api/jobs': return self.json(dict(items=[public_job(r) for r in query('SELECT * FROM jobs ORDER BY created_at DESC')]))
         match=re.fullmatch(r'/api/datasets/([a-f0-9]{32})/dashboard',path)
         if match:
             row=query('SELECT * FROM datasets WHERE id=?',(match[1],),one=True)
@@ -119,7 +132,7 @@ class Handler(BaseHTTPRequestHandler):
         if match:
             row=query('SELECT * FROM jobs WHERE id=?',(match[1],),one=True)
             if not row: return self.error('任务不存在。',404)
-            if not match[2]: return self.json(row)
+            if not match[2]: return self.json(public_job(row))
             if row['status']!='succeeded': return self.error('排产结果尚未就绪。',409)
             out=STORAGE/'runs'/row['id'];result=read_json(out/'result.json')
             if match[2]=='result': return self.json(result)

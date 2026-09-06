@@ -15,6 +15,12 @@ def dump(path, data):
     Path(path).write_text(json.dumps(data, ensure_ascii=False, allow_nan=False, default=str), encoding='utf-8')
 
 
+def progress(out, percent, stage, message):
+    temporary=out/'progress.tmp'
+    dump(temporary,dict(percent=percent,stage=stage,message=message))
+    temporary.replace(out/'progress.json')
+
+
 def metadata(data):
     warning_count=len(data['warnings'])
     return dict(snapshot=str(data['snapshot']), counts=data['counts'], warnings=data['warnings'],
@@ -81,6 +87,7 @@ def run(data, out, strategy, station):
     schedules=[];unassigned=[];stats=[];files=[]
     _, initial=initial_occupancy(data['wip'],args[3],data['snapshot'])
     for idx,name in enumerate(stations):
+        progress(out,10+int(75*idx/max(1,len(stations))),'scheduling',f'正在安排 {name} 工站（{idx+1}/{len(stations)}），计算设备分配并生成工站文件')
         print(f'工站 {idx+1}/{len(stations)} {name}',flush=True)
         jobs=data['pending'][data['pending']['下一工站']==name].reset_index(drop=True)
         if strategy=='balanced':
@@ -105,9 +112,11 @@ def run(data, out, strategy, station):
             args[5].setdefault(row['设备'],[]).append((row['开始时间'],row['完成时间']))
     schedule=pd.concat(schedules,ignore_index=True) if schedules else pd.DataFrame(columns=SCHEDULE_COLUMNS)
     unscheduled=pd.concat(unassigned,ignore_index=True) if unassigned else pd.DataFrame(columns=['job_id','制造单号','批次','工艺路线','下一工站','数量','未排原因'])
+    progress(out,85,'checking','正在核验设备资格、维修窗口、在制占用与任务守恒')
     validate_result(data,schedule,unscheduled,initial)
     metrics=pd.concat(stats,ignore_index=True) if stats else pd.DataFrame()
     # 复用工程原有 Excel 导出方式，所有空结果也保留表头。
+    progress(out,92,'exporting','正在生成汇总工作簿、结果摘要与下载包')
     with pd.ExcelWriter(out/'summary.xlsx',engine='openpyxl') as writer:
         schedule.to_excel(writer,sheet_name='全部排产',index=False)
         initial.to_excel(writer,sheet_name='初始WIP',index=False)
@@ -137,6 +146,7 @@ def main():
     parser.add_argument('--strategy',choices=['quick','balanced'],default='quick');parser.add_argument('--station',default='')
     cli=parser.parse_args();out=Path(cli.output);out.mkdir(parents=True,exist_ok=True)
     try:
+        if cli.action=='run': progress(out,5,'loading','正在读取生产数据与设备约束')
         data=load_product(cli.dataset)
         if cli.action=='validate': dump(out/'metadata.json',metadata(data));dump(out/'dashboard.json',dashboard(data))
         else: run(data,out,cli.strategy,cli.station)
