@@ -86,7 +86,7 @@ def decode_schedule(
             machine_ready[machine] = max(machine_ready[machine], max(end for _, end in active))
 
         # 当前状态就是故障/维修
-        if status in blocked_status:
+        if status in blocked_status and not periods:
             # 任意未来维护窗口不等于当前故障的已确认恢复时间。
             disabled_machines.add(machine)
 

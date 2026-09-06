@@ -11,6 +11,8 @@ REQUIRED = {
     '7-优先级': ['制造单号','优先级'],
     '8-制造单批次流转表': ['制造单号','批次','数量','工艺路线','下一工站'],
 }
+DEVICE_NAME_ALIASES = ['设备名称']
+REQUIRED_DEVICE_COLS = ['设备名'] + DEVICE_NAME_ALIASES
 BLOCKED = {'故障','维修','维修中','停机','不可用','未知','数据冲突'}
 
 class DatasetError(ValueError):
@@ -46,7 +48,16 @@ def load_product(path):
         tables={name:pd.read_excel(book,name) for name in book.sheet_names}
     for name,cols in REQUIRED.items():
         absent=set(cols)-set(tables[name].columns)
-        if absent: raise DatasetError(name+' 缺少列：'+'、'.join(sorted(absent)))
+        if absent:
+            if name=='3-设备表' and '设备名' in absent:
+                found_alias=None
+                for alias in DEVICE_NAME_ALIASES:
+                    if alias in tables[name].columns:
+                        found_alias=alias;break
+                if found_alias:
+                    tables[name]=tables[name].rename(columns={found_alias:'设备名'})
+                    absent=set(cols)-set(tables[name].columns)
+            if absent: raise DatasetError(name+' 缺少列：'+'、'.join(sorted(absent)))
     if any(len(t)>30000 for t in tables.values()): raise DatasetError('单张工作表最多支持 30,000 行。')
     snapshots=set()
     for table in tables.values():
