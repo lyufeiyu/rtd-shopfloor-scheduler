@@ -176,6 +176,36 @@ def query(sql,params=(),one=False):
     return (dict(rows[0]) if rows else None) if one else [dict(r) for r in rows]
 def write(sql,params=()):
     with db() as conn: conn.execute(sql,params)
+def dataset_available(dataset_id):
+    folder=STORAGE/'datasets'/dataset_id
+    return all((folder/name).is_file() for name in ('input.xlsx','metadata.json','dashboard.json'))
+def table_available(table_id):
+    return (STORAGE/'tables'/table_id/'data.json').is_file()
+def public_datasets():
+    items=[];skipped=[]
+    for row in query('SELECT * FROM datasets ORDER BY created_at DESC'):
+        if not dataset_available(row['id']):
+            skipped.append(row['id'])
+            continue
+        try:
+            items.append(public_dataset(row))
+        except (OSError,ValueError):
+            logging.warning('invalid_dataset_skipped id=%s',row['id'],exc_info=True)
+    if skipped: logging.warning('orphan_datasets_skipped count=%s',len(skipped))
+    return items
+def public_jobs():
+    items=[];orphaned=[];missing_results=[]
+    for row in query('SELECT * FROM jobs ORDER BY created_at DESC'):
+        if not dataset_available(row['dataset_id']):
+            orphaned.append(row['id'])
+            continue
+        if row['status']=='succeeded' and not (STORAGE/'runs'/row['id']/'result.json').is_file():
+            missing_results.append(row['id'])
+            continue
+        items.append(public_job(row))
+    if orphaned: logging.warning('orphan_jobs_skipped count=%s',len(orphaned))
+    if missing_results: logging.warning('jobs_without_results_skipped count=%s',len(missing_results))
+    return items
 def public_dataset(row):
     meta=read_json(STORAGE/'datasets'/row['id']/'metadata.json')
     return {**meta,**row}
@@ -413,14 +443,18 @@ class Handler(BaseHTTPRequestHandler):
             file = ROOT / 'frontend' / name
             return self.send_bytes(file.read_bytes(), ctype)
         if path=='/api/health': return self.json(dict(status='ok'))
-        if path=='/api/datasets': return self.json(dict(items=[public_dataset(r) for r in query('SELECT * FROM datasets ORDER BY created_at DESC')]))
-        if path=='/api/jobs': return self.json(dict(items=[public_job(r) for r in query('SELECT * FROM jobs ORDER BY created_at DESC')]))
+        if path=='/api/datasets': return self.json(dict(items=public_datasets()))
+        if path=='/api/jobs': return self.json(dict(items=public_jobs()))
         if path=='/api/tables':
-            items=[]
+            items=[];skipped=0
             for r in query('SELECT * FROM tables ORDER BY created_at DESC'):
+                if not table_available(r['id']):
+                    skipped+=1
+                    continue
                 d=dict(r)
                 d['rows']=d.pop('rows_count',0)
                 items.append(d)
+            if skipped: logging.warning('orphan_tables_skipped count=%s',skipped)
             return self.json(dict(items=items))
         if path=='/api/tables/defs':
             return self.json(dict(defs={k:{'label':v['label'],'description':v['description'],'columns':v['columns']} for k,v in TABLE_DEFS.items()}))
@@ -428,20 +462,25 @@ class Handler(BaseHTTPRequestHandler):
         if match:
             row=query('SELECT * FROM tables WHERE id=?',(match[1],),one=True)
             if not row: return self.error('数据表不存在。',404)
+            if not table_available(row['id']): return self.error('数据表文件已丢失，请重新导入。',404)
             data=read_json(STORAGE/'tables'/row['id']/'data.json')
             return self.json(dict(**row,**data))
         match=re.fullmatch(r'/api/datasets/([a-f0-9]{32})/dashboard',path)
         if match:
             row=query('SELECT * FROM datasets WHERE id=?',(match[1],),one=True)
             if not row: return self.error('数据集不存在。',404)
+            if not dataset_available(row['id']): return self.error('数据集文件已丢失，请重新导入。',404)
             return self.json(read_json(STORAGE/'datasets'/row['id']/'dashboard.json'))
         match=re.fullmatch(r'/api/jobs/([a-f0-9]{32})(?:/(result|files/([a-z0-9.-]+)))?',path)
         if match:
             row=query('SELECT * FROM jobs WHERE id=?',(match[1],),one=True)
             if not row: return self.error('任务不存在。',404)
+            if not dataset_available(row['dataset_id']): return self.error('任务关联的数据集文件已丢失。',404)
             if not match[2]: return self.json(public_job(row))
             if row['status']!='succeeded': return self.error('排产结果尚未就绪。',409)
-            out=STORAGE/'runs'/row['id'];result=read_json(out/'result.json')
+            out=STORAGE/'runs'/row['id']
+            if not (out/'result.json').is_file(): return self.error('排产结果文件已丢失。',404)
+            result=read_json(out/'result.json')
             if match[2]=='result': return self.json(result)
             files={f['id']:f['name'] for f in result['files']};files['results.zip']='排产结果包.zip'
             name=match[3]
@@ -545,6 +584,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError('请先选择数据集。')
         row=query('SELECT * FROM datasets WHERE id=?',(dataset_id,),one=True)
         if not row: return self.error('数据集不存在。',404)
+        if not dataset_available(dataset_id): return self.error('数据集文件已丢失，请重新导入。',404)
         try:
             results=extract_tables_from_dataset(dataset_id)
             self.json(dict(status='ok',items=results))
@@ -564,6 +604,7 @@ class Handler(BaseHTTPRequestHandler):
         if strategy not in ['quick','balanced'] or not isinstance(station,str): raise ValueError('排产参数无效。')
         row=query('SELECT * FROM datasets WHERE id=?',(dataset_id,),one=True)
         if not row: return self.error('数据集不存在。',404)
+        if not dataset_available(dataset_id): return self.error('数据集文件已丢失，请重新导入。',404)
         meta=public_dataset(row)
         if station and station not in meta['stations']: raise ValueError('工站不在当前数据集中。')
         with JOB_LOCK:

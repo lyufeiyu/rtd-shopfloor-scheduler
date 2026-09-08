@@ -1,0 +1,3 @@
+# Keep Windows batch launchers byte-for-byte so GitHub source archives retain CRLF.
+*.cmd -text
+*.bat -text
