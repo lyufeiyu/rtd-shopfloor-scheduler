@@ -73,4 +73,10 @@ chmod +x 启动RTD-macOS.command 停止RTD-macOS.command
 
 服务仅监听本机地址 `127.0.0.1`，不会直接向局域网或互联网开放。日志位于 `storage/logs/`；Windows 启动器的标准错误日志为 `storage/logs/launcher-windows-error.log`。
 
+## 本地数据与 GitHub
+
+`storage/` 是每台电脑独立的运行数据目录，其中包含上传的生产数据、SQLite 状态库、排产结果和日志。该目录可能包含企业生产数据，且数据库记录必须与 `datasets/`、`runs/` 中的文件保持一致，因此**不应上传到 GitHub**。
+
+拉取或克隆代码后，首次启动会自动创建空的 `storage/`。需要迁移历史数据时，应先停止 RTD，再通过可信的内部存储介质整体复制 `storage/`，不要只复制 `state.sqlite`。如果数据库中存在记录但对应文件缺失，服务会跳过这些失效记录，并在页面顶部显示恢复提示。
+
 更详细的接口、数据口径和验收说明见 [frontend/README.md](frontend/README.md)。

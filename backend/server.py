@@ -182,17 +182,23 @@ def dataset_available(dataset_id):
 def table_available(table_id):
     return (STORAGE/'tables'/table_id/'data.json').is_file()
 def public_datasets():
-    items=[];skipped=[]
+    items=[];missing=[];invalid=[]
     for row in query('SELECT * FROM datasets ORDER BY created_at DESC'):
         if not dataset_available(row['id']):
-            skipped.append(row['id'])
+            missing.append(row['id'])
             continue
         try:
             items.append(public_dataset(row))
         except (OSError,ValueError):
+            invalid.append(row['id'])
             logging.warning('invalid_dataset_skipped id=%s',row['id'],exc_info=True)
-    if skipped: logging.warning('orphan_datasets_skipped count=%s',len(skipped))
-    return items
+    warnings=[]
+    if missing:
+        logging.warning('orphan_datasets_skipped count=%s',len(missing))
+        warnings.append(f'已跳过 {len(missing)} 个文件不完整的数据集；请重新上传对应 Excel，或恢复与数据库匹配的完整 storage 目录。')
+    if invalid:
+        warnings.append(f'已跳过 {len(invalid)} 个元数据损坏的数据集；请重新上传对应 Excel。')
+    return dict(items=items,warnings=warnings)
 def public_jobs():
     items=[];orphaned=[];missing_results=[]
     for row in query('SELECT * FROM jobs ORDER BY created_at DESC'):
@@ -205,7 +211,11 @@ def public_jobs():
         items.append(public_job(row))
     if orphaned: logging.warning('orphan_jobs_skipped count=%s',len(orphaned))
     if missing_results: logging.warning('jobs_without_results_skipped count=%s',len(missing_results))
-    return items
+    warnings=[]
+    skipped=len(orphaned)+len(missing_results)
+    if skipped:
+        warnings.append(f'已跳过 {skipped} 条关联数据或排产结果文件缺失的任务记录。')
+    return dict(items=items,warnings=warnings)
 def public_dataset(row):
     meta=read_json(STORAGE/'datasets'/row['id']/'metadata.json')
     return {**meta,**row}
@@ -443,8 +453,8 @@ class Handler(BaseHTTPRequestHandler):
             file = ROOT / 'frontend' / name
             return self.send_bytes(file.read_bytes(), ctype)
         if path=='/api/health': return self.json(dict(status='ok'))
-        if path=='/api/datasets': return self.json(dict(items=public_datasets()))
-        if path=='/api/jobs': return self.json(dict(items=public_jobs()))
+        if path=='/api/datasets': return self.json(public_datasets())
+        if path=='/api/jobs': return self.json(public_jobs())
         if path=='/api/tables':
             items=[];skipped=0
             for r in query('SELECT * FROM tables ORDER BY created_at DESC'):
